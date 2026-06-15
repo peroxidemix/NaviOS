@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 
 import gi
 gi.require_version("Gtk", "3.0")
@@ -8,7 +7,6 @@ import cairo
 import math
 import subprocess
 
-# ---- CONFIG ----------------------------------------------------------
 
 NODES = [
     {"label": "firefox",  "cmd": "firefox"},
@@ -23,7 +21,6 @@ RING_RADIUS_FRAC = 0.22            # fraction of min(width,height)
 NODE_RADIUS = 46
 LINE_WIDTH  = 1.4
 
-# ------------------------------------------------------------------------
 
 class Navi(Gtk.Window):
     def __init__(self):
@@ -58,13 +55,11 @@ class Navi(Gtk.Window):
 
         self.show_all()
 
-    # -- animation -----------------------------------------------------
     def on_tick(self):
         self.tick += 1
         self.queue_draw()
         return True
 
-    # -- input -----------------------------------------------------------
     def on_key(self, widget, event):
         if event.keyval == Gdk.KEY_Escape:
             Gtk.main_quit()
@@ -87,30 +82,25 @@ class Navi(Gtk.Window):
                 subprocess.Popen(["sh", "-c", cmd])
                 Gtk.main_quit()
                 return True
-        # clicked background -> dismiss
         Gtk.main_quit()
         return True
 
-    # -- drawing ---------------------------------------------------------
     def on_draw(self, widget, ctx):
         alloc = self.get_allocation()
         w, h = alloc.width, alloc.height
         cx0, cy0 = w / 2, h / 2
 
-        # transparent backdrop (very faint dark wash so it reads as "active")
         ctx.set_source_rgba(0.02, 0.01, 0.0, 0.35)
         ctx.paint()
 
         radius = min(w, h) * RING_RADIUS_FRAC
         n = len(NODES)
 
-        # outer guide ring (subtle, dim amber)
         ctx.set_source_rgba(*AMBER_DIM, 0.5)
         ctx.set_line_width(1)
         ctx.arc(cx0, cy0, radius, 0, 2 * math.pi)
         ctx.stroke()
 
-        # rotating tick marks around the ring
         rot = self.tick * 0.004
         for i in range(36):
             a = rot + i * (2 * math.pi / 36)
@@ -124,7 +114,6 @@ class Navi(Gtk.Window):
             ctx.line_to(x2, y2)
             ctx.stroke()
 
-        # center hub
         pulse = 0.5 + 0.5 * math.sin(self.tick * 0.05)
         ctx.set_source_rgba(*CYAN, 0.15 + 0.15 * pulse)
         ctx.arc(cx0, cy0, 18 + 4 * pulse, 0, 2 * math.pi)
@@ -134,7 +123,6 @@ class Navi(Gtk.Window):
         ctx.arc(cx0, cy0, 10, 0, 2 * math.pi)
         ctx.stroke()
 
-        # nodes
         self.node_positions = []
         for i, node in enumerate(NODES):
             angle = -math.pi / 2 + i * (2 * math.pi / n)
@@ -145,17 +133,14 @@ class Navi(Gtk.Window):
             is_hover = (i == self.hover)
             col = CYAN if is_hover else AMBER
 
-            # connecting line to center
             ctx.set_source_rgba(*AMBER_DIM, 0.7)
             ctx.set_line_width(LINE_WIDTH)
             ctx.move_to(cx0, cy0)
             ctx.line_to(nx, ny)
             ctx.stroke()
 
-            # node hexagon
             self.draw_hex(ctx, nx, ny, NODE_RADIUS, col, is_hover)
 
-            # label
             ctx.set_source_rgba(*col, 1.0)
             ctx.select_font_face("monospace", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
             ctx.set_font_size(15)
@@ -167,7 +152,6 @@ class Navi(Gtk.Window):
         return False
 
     def draw_hex(self, ctx, cx, cy, r, color, hover):
-        # outer hex
         ctx.new_path()
         for i in range(6):
             a = math.pi / 6 + i * (math.pi / 3)
@@ -186,7 +170,6 @@ class Navi(Gtk.Window):
         ctx.set_line_width(2 if hover else 1.5)
         ctx.stroke()
 
-        # inner hex (smaller, decorative)
         ctx.new_path()
         ir = r * 0.6
         for i in range(6):

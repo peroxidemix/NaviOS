@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 
 import gi
 gi.require_version("Gtk", "3.0")
@@ -17,7 +16,6 @@ CYAN_DIM = (0.18, 0.40, 0.50)
 PINK     = (0.85, 0.45, 0.65)
 WHITE    = (0.85, 0.90, 0.95)
 
-# fragments shown briefly at random positions (generic system-log style strings)
 LOG_FRAGMENTS = [
     "INIT::wired_link",
     "node_sync ... ok",
@@ -111,22 +109,18 @@ class Splash(Gtk.Window):
         if self.particles is None:
             self.particles = [Particle(w, h) for _ in range(80)]
 
-        # fade in/out envelope
         alpha = 1.0
         if t < 0.6:
             alpha = t / 0.6
         elif t > DURATION - 1.2:
             alpha = max(0.0, (DURATION - t) / 1.2)
 
-        # ---------------- background ----------------
         ctx.set_source_rgba(*NAVY, alpha)
         ctx.paint()
 
-        # ---------------- perspective grid floor ----------------
         horizon = h * 0.62
         ctx.set_source_rgba(*CYAN_DIM, 0.35 * alpha)
         ctx.set_line_width(1)
-        # converging vertical lines
         n_lines = 14
         for i in range(-n_lines, n_lines + 1):
             x_far = cx + i * (w * 0.02)
@@ -134,7 +128,6 @@ class Splash(Gtk.Window):
             ctx.move_to(x_far, horizon)
             ctx.line_to(x_near, h)
             ctx.stroke()
-        # horizontal lines, spaced exponentially toward horizon, scrolling
         scroll = (t * 0.15) % 1.0
         for j in range(8):
             frac = (j + scroll) / 8.0
@@ -144,14 +137,12 @@ class Splash(Gtk.Window):
             ctx.line_to(w, y)
             ctx.stroke()
 
-        # ---------------- particle field ----------------
         for p in self.particles:
             p.update(dt, w, h)
             ctx.set_source_rgba(*CYAN, p.bright * alpha)
             ctx.rectangle(p.x, p.y, p.size, p.size)
             ctx.fill()
 
-        # ---------------- central wireframe globe ----------------
         radius = min(w, h) * 0.16
         rot = t * 0.6
 
@@ -166,7 +157,6 @@ class Splash(Gtk.Window):
             ctx.stroke()
             ctx.restore()
 
-        # outer dotted ring
         for i in range(60):
             a = rot * 1.5 + i * (2 * math.pi / 60)
             r = radius * 1.6
@@ -176,7 +166,6 @@ class Splash(Gtk.Window):
             ctx.rectangle(x, y, 1.5, 1.5)
             ctx.fill()
 
-        # central sphere
         ctx.set_source_rgba(*CYAN, 0.85 * alpha)
         ctx.set_line_width(1.6)
         ctx.arc(cx, cy, radius * 0.55, 0, 2 * math.pi)
@@ -192,7 +181,6 @@ class Splash(Gtk.Window):
             ctx.stroke()
             ctx.restore()
 
-        # vertical meridian lines (rotating)
         for k in range(3):
             ctx.save()
             ctx.translate(cx, cy)
@@ -204,7 +192,6 @@ class Splash(Gtk.Window):
             ctx.stroke()
             ctx.restore()
 
-        # crosshair
         cross_r = radius * 0.12
         ctx.set_source_rgba(*CYAN, 0.9 * alpha)
         ctx.set_line_width(1.2)
@@ -213,7 +200,6 @@ class Splash(Gtk.Window):
             ctx.line_to(cx + dx * cross_r * 1.8, cy + dy * cross_r * 1.8)
             ctx.stroke()
 
-        # ---------------- corner brackets (HUD framing) ----------------
         bracket = 28
         margin = 24
         ctx.set_source_rgba(*CYAN, 0.6 * alpha)
@@ -229,7 +215,6 @@ class Splash(Gtk.Window):
             ctx.line_to(bx + dx * bracket, by)
             ctx.stroke()
 
-        # ---------------- branding text ----------------
         ctx.save()
         ctx.translate(w * 0.16, h * 0.20)
         ctx.rotate(-0.32)
@@ -249,14 +234,12 @@ class Splash(Gtk.Window):
         ctx.move_to(w * 0.05, h * 0.80)
         ctx.show_text("...Enterprise Os....")
 
-        # status line bottom-left, monospace, small
         ctx.set_source_rgba(*CYAN_DIM, 0.8 * alpha)
         ctx.select_font_face("monospace", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
         ctx.set_font_size(12)
         ctx.move_to(margin + 6, h - margin - 8)
         ctx.show_text(f"BOOT SEQUENCE :: t+{t:5.2f}s")
 
-        # ---------------- flickering log fragments ----------------
         if t - self.last_frag_spawn > 0.35 and len(self.fragments) < 6:
             self.last_frag_spawn = t
             text = random.choice(LOG_FRAGMENTS)
@@ -278,7 +261,6 @@ class Splash(Gtk.Window):
                 new_fragments.append(frag)
         self.fragments = new_fragments
 
-        # ---------------- glitch bars ----------------
         if t > self.glitch_until:
             if random.random() < 0.02:
                 self.glitch_until = t + random.uniform(0.04, 0.12)
@@ -295,7 +277,6 @@ class Splash(Gtk.Window):
                 ctx.paint()
                 ctx.restore()
 
-        # ---------------- "lain" pink accent ----------------
         if t > 2.0:
             lain_alpha = min(1.0, (t - 2.0) / 1.0) * alpha
             ctx.set_source_rgba(*PINK, lain_alpha)
@@ -304,7 +285,6 @@ class Splash(Gtk.Window):
             ctx.move_to(w * 0.55, h * 0.80)
             ctx.show_text("lain")
 
-        # ---------------- scanlines (drawn last, on top) ----------------
         ctx.set_source_rgba(0, 0, 0, 0.18 * alpha)
         y = 0
         while y < h:
@@ -312,7 +292,6 @@ class Splash(Gtk.Window):
             ctx.fill()
             y += 3
 
-        # subtle vignette
         grad = cairo.RadialGradient(cx, h * 0.5, h * 0.2, cx, h * 0.5, h * 0.9)
         grad.add_color_stop_rgba(0, 0, 0, 0, 0)
         grad.add_color_stop_rgba(1, 0, 0, 0, 0.55 * alpha)
