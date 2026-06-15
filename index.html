@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; padding: 0; overflow: hidden; background: #000; height: 100%; }
+  @keyframes bgBreathe {
+    0%, 100% { filter: brightness(1) saturate(1); }
+    50% { filter: brightness(1.08) saturate(1.1); }
+  }
+  #bg {
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    object-fit: cover; z-index: 0;
+    animation: bgBreathe 6s ease-in-out infinite;
+  }
+  #tethers { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; pointer-events: none; }
+  .tether {
+    stroke: #7ea8ff;
+    stroke-width: 2;
+    fill: none;
+    opacity: 0;
+    filter: drop-shadow(0 0 4px rgba(126,168,255,0.9));
+  }
+  @keyframes tetherFade {
+    0% { opacity: 0; }
+    15% { opacity: 1; }
+    70% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+  .tether.active {
+    animation: tetherFade 1.2s ease-out forwards;
+  }
+  #glitch {
+    position: fixed; inset: 0; z-index: 4; pointer-events: none;
+    overflow: hidden;
+  }
+  .glitch-band {
+    position: absolute; left: 0; right: 0;
+    background-image: url('navi-bg-pingpong.gif');
+    background-size: cover;
+    filter: brightness(1.4) saturate(1.6);
+    mix-blend-mode: screen;
+  }
+  .node {
+    position: fixed; z-index: 2;
+    width: 165px; height: 95px;
+    image-rendering: pixelated;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    transform: scale(1);
+    transition: transform 0.8s ease-out;
+  }
+  @keyframes bob {
+    0%, 100% { translate: 0 0; }
+    50% { translate: 0 -16px; }
+  }
+  @keyframes bobSubtle {
+    0%, 100% { translate: 0 0; }
+    50% { translate: 0 -4px; }
+  }
+  .node {
+    animation-name: glow, bob;
+    animation-duration: 2.4s, 4s;
+    animation-timing-function: ease-in-out, ease-in-out;
+    animation-iteration-count: infinite, infinite;
+  }
+  @keyframes glow {
+    0%, 100% { filter: drop-shadow(0 0 10px rgba(90,140,230,0.7)); }
+    50% { filter: drop-shadow(0 0 28px rgba(90,140,230,1)); }
+  }
+  .node.focused {
+    animation-name: glowFocused, bob;
+    animation-duration: 1.2s, 4s;
+    animation-timing-function: ease-in-out, ease-in-out;
+    animation-iteration-count: infinite, infinite;
+    animation-play-state: running, paused;
+    scale: 1.12;
+  }
+  @keyframes glowFocused {
+    0%, 100% { filter: drop-shadow(0 0 14px rgba(160,200,255,1)) drop-shadow(0 0 28px rgba(120,170,255,0.9)); }
+    50% { filter: drop-shadow(0 0 24px rgba(180,215,255,1)) drop-shadow(0 0 48px rgba(120,170,255,1)); }
+  }
+  .node canvas {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    image-rendering: pixelated;
+  }
+  .node .flash-canvas {
+    opacity: 0;
+  }
+  .node.focused .flash-canvas {
+    animation: flashGreen 1.2s ease-in-out infinite;
+  }
+  @keyframes flashGreen {
+    0%, 100% { opacity: 0; }
+    50% { opacity: 0.85; }
+  }
+  .shard {
+    position: fixed;
+    z-index: 6;
+    pointer-events: none;
+    image-rendering: pixelated;
+    overflow: hidden;
+    transition: transform 0.9s cubic-bezier(.3,0,.7,1), opacity 0.3s ease 0.6s;
+  }
+  .cursor-trail {
+    position: fixed;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(126,168,255,0.6), transparent 70%);
+    pointer-events: none;
+    z-index: 5;
+    transform: translate(-50%, -50%);
+    animation: trailFade 0.6s ease-out forwards;
+  }
+  @keyframes trailFade {
+    0% { opacity: 0.7; transform: translate(-50%,-50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%,-50%) scale(2.5); }
+  }
+  #syspanel {
+    position: fixed; top: 16px; left: 16px; z-index: 3;
+    background: rgba(10, 21, 48, 0.55);
+    border: 1px solid rgba(160, 220, 255, 0.5);
+    border-radius: 2px;
+    box-shadow: 0 0 12px rgba(126,200,212,0.2);
+    padding: 6px 10px;
+    min-width: 150px;
+  }
+  #syspanel .title {
+    font-family: 'Love Letter Typewriter', monospace;
+    font-size: 10px;
+    color: #7ec8d4;
+    opacity: 0.7;
+    letter-spacing: 2px;
+    margin-bottom: 6px;
+    border-bottom: 1px solid rgba(126,200,212,0.3);
+    padding-bottom: 4px;
+  }
+  #syslog {
+    font-family: 'Love Letter Typewriter', monospace;
+    font-size: 11px;
+    color: #7ec8d4;
+    text-shadow: 1px 1px 0 #1c2454;
+    opacity: 0.7;
+    line-height: 1.5;
+    white-space: pre;
+  }
+  .sysline {
+    opacity: 0;
+    animation: lineIn 0.4s ease-out forwards;
+  }
+  @keyframes lineIn {
+    0% { opacity: 0; transform: translateX(-8px); }
+    100% { opacity: 1; transform: translateX(0); }
+  }
+  #musicwidget {
+    animation-name: glow, bob;
+    animation-duration: 2.4s, 4.5s;
+    animation-timing-function: ease-in-out, ease-in-out;
+    animation-iteration-count: infinite, infinite;
+    animation-delay: 0s, 1.5s;
+    position: fixed; top: 16px; right: 220px; z-index: 3;
+    width: 200px; height: 200px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    padding: 30px 28px;
+    border-radius: 50%;
+    font-family: 'Love Letter Typewriter', monospace;
+    color: #eaf0ff;
+    text-shadow: 1px 1px 0 #1c2454;
+    transition: opacity 0.3s ease;
+    opacity: 0;
+    box-sizing: border-box;
+    text-align: center;
+  }
+  #musicwidget canvas.pillcanvas {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    z-index: -1;
+    border-radius: 50%;
+  }
+  #musicwidget.visible { opacity: 1; }
+  #musicwidget #albumart {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    object-fit: cover;
+    display: none;
+    position: relative; z-index: 1;
+    flex-shrink: 0;
+    border: 2px solid rgba(234,240,255,0.3);
+  }
+  #musicwidget #albumart.show { display: block; }
+  #musicwidget #musicinfo { display: flex; flex-direction: column; min-width: 0; flex: 1; position: relative; z-index: 1; }
+  #musicwidget #title { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px; }
+  #musicwidget #artist { font-size: 9px; opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 4px; margin-bottom: 8px; max-width: 130px; }
+  #musicwidget #progress-track {
+    width: 130px; height: 3px;
+    background: rgba(20,30,80,0.5);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  #musicwidget #progress-fill {
+    height: 100%;
+    background: #eaf0ff;
+    border-radius: 2px;
+    transition: width 0.5s linear;
+  }
+  #musicwidget #controls {
+    display: flex; gap: 2px; margin-top: 2px;
+    justify-content: center; align-items: center;
+  }
+  #musicwidget .ctrlbtn {
+    background: none;
+    border: none; cursor: pointer;
+    color: #eaf0ff; font-size: 16px;
+    font-family: 'Love Letter Typewriter', monospace;
+    opacity: 0.85;
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+  }
+  #musicwidget .ctrlbtn:hover {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  #musicwidget #btn-playpause { width: 38px; height: 38px; font-size: 19px; }
+  .letter.bobbing {
+    animation: bob 4s ease-in-out infinite;
+  }
+  .letter {
+
+    position: fixed;
+    z-index: 3;
+    transform: translate(-50%, -50%);
+    font-family: 'Love Letter Typewriter', monospace;
+    color: #eaf0ff;
+    font-size: 18px;
+    text-shadow: 1px 1px 0 #1c2454, 2px 2px 0 #141a3a, 3px 3px 0 #0a0d24;
+    pointer-events: none;
+    transition: left 0.5s ease-in-out, top 0.5s ease-in-out;
+  }
+</style>
+</head>
+<body>
+  <img id="bg" src="navi-bg-pingpong.gif">
+  <svg id="tethers"></svg>
+  <div id="glitch"></div>
+  <div id="letters"></div>
+  <div id="musicwidget"><canvas class="pillcanvas" width="200" height="200"></canvas>
+    <img id="albumart" src="">
+    <div id="musicinfo">
+      <div id="title">---</div>
+      <div id="artist">---</div>
+      <div id="progress-track"><div id="progress-fill" style="width:0%"></div></div>
+      <div id="controls">
+        <button class="ctrlbtn" id="btn-prev">«</button>
+        <button class="ctrlbtn" id="btn-playpause">▶</button>
+        <button class="ctrlbtn" id="btn-next">»</button>
+      </div>
+    </div>
+  </div>
+  <div id="syspanel"><div class="title">SYSTEM</div><div id="syslog"></div></div>
+  <audio id="bgmusic" src="lainos.mp3" loop></audio>
+
+  <div class="node focused" data-x="65" data-y="30" data-label="terminal" style="left: 65%; top: 30%;">
+    <canvas class="pillcanvas" width="72" height="42"></canvas>
+    <canvas class="flash-canvas" width="72" height="42"></canvas>
+  </div>
+
+  <div class="node" data-x="45" data-y="75" data-label="files" style="left: 45%; top: 75%;">
+    <canvas class="pillcanvas" width="72" height="42"></canvas>
+    <canvas class="flash-canvas" width="72" height="42"></canvas>
+  </div>
+  <div class="node" data-x="20" data-y="55" data-label="browser" style="left: 20%; top: 55%;">
+    <canvas class="pillcanvas" width="72" height="42"></canvas>
+    <canvas class="flash-canvas" width="72" height="42"></canvas>
+  </div>
+  <div class="node" data-x="75" data-y="70" data-label="spotify" style="left: 75%; top: 70%;">
+    <canvas class="pillcanvas" width="72" height="42"></canvas>
+    <canvas class="flash-canvas" width="72" height="42"></canvas>
+  </div>
+  <div class="node" data-x="35" data-y="25" data-label="ryujinx" style="left: 35%; top: 25%;">
+    <canvas class="pillcanvas" width="72" height="42"></canvas>
+    <canvas class="flash-canvas" width="72" height="42"></canvas>
+  </div>
+  <div class="node" data-x="60" data-y="85" data-label="bluetooth" style="left: 60%; top: 85%;">
+    <canvas class="pillcanvas" width="72" height="42"></canvas>
+    <canvas class="flash-canvas" width="72" height="42"></canvas>
+  </div>
+
+  <script>
+    document.querySelectorAll('.pillcanvas').forEach(c => {
+      const ctx = c.getContext('2d');
+      const w = c.width, h = c.height;
+      const cx = w / 2, cy = h / 2;
+      const rx = w / 2, ry = h / 2;
+
+      const grad = ctx.createRadialGradient(cx - rx*0.3, cy - ry*0.35, 2, cx, cy, rx * 0.92);
+      grad.addColorStop(0, '#9fb6f2');
+      grad.addColorStop(0.45, '#6f86d6');
+      grad.addColorStop(1, '#3a4ea0');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rx * 0.85, ry * 0.8, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.globalCompositeOperation = 'overlay';
+      function shineDot(sx, sy, size, alpha) {
+        const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, size);
+        g.addColorStop(0, 'rgba(255,255,255,' + alpha + ')');
+        g.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(sx, sy, size, 0, Math.PI*2);
+        ctx.fill();
+      }
+      shineDot(cx - rx*0.4, cy - ry*0.45, 8, 0.5);
+      shineDot(cx + rx*0.5, cy - ry*0.2, 7, 0.4);
+      shineDot(cx - rx*0.1, cy + ry*0.5, 7, 0.35);
+      ctx.globalCompositeOperation = 'source-over';
+    });
+
+    document.querySelectorAll('.flash-canvas').forEach(c => {
+      const ctx = c.getContext('2d');
+      const w = c.width, h = c.height;
+      const cx = w / 2, cy = h / 2;
+      const rx = w / 2, ry = h / 2;
+
+      const grad = ctx.createRadialGradient(cx - rx*0.3, cy - ry*0.35, 2, cx, cy, rx * 0.92);
+      grad.addColorStop(0, '#c8ffd9');
+      grad.addColorStop(0.45, '#6fe0a0');
+      grad.addColorStop(1, '#1f8a4f');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rx * 0.85, ry * 0.8, 0, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    const musicWidget = document.getElementById('musicwidget');
+    const albumArtEl = document.getElementById('albumart');
+    document.getElementById('btn-prev').addEventListener('click', () => window.webkit.messageHandlers.launch.postMessage('media-prev'));
+    document.getElementById('btn-playpause').addEventListener('click', () => window.webkit.messageHandlers.launch.postMessage('media-playpause'));
+    document.getElementById('btn-next').addEventListener('click', () => window.webkit.messageHandlers.launch.postMessage('media-next'));
+
+    window.updateMusic = (data) => {
+      if (!data || !data.title) {
+        musicWidget.classList.remove('visible');
+        return;
+      }
+      musicWidget.classList.add('visible');
+      document.getElementById('title').textContent = data.title;
+      document.getElementById('artist').textContent = data.artist || '';
+      document.getElementById('progress-fill').style.width = (data.progress || 0) + '%';
+      document.getElementById('btn-playpause').textContent = data.playing ? '⏸' : '▶';
+      if (data.art) {
+        albumArtEl.src = data.art;
+        albumArtEl.classList.add('show');
+      } else {
+        albumArtEl.classList.remove('show');
+      }
+    };
+
+    const syslogEl = document.getElementById('syslog');
+    const sysLines = [];
+    const SYS_MAX_LINES = 7;
+    function pushSysLine(text) {
+      const span = document.createElement('div');
+      span.className = 'sysline';
+      span.textContent = text;
+      syslogEl.appendChild(span);
+      sysLines.push(span);
+      if (sysLines.length > SYS_MAX_LINES) {
+        sysLines.shift().remove();
+      }
+    }
+
+    const nodes = Array.from(document.querySelectorAll('.node'));
+    nodes.forEach((n, i) => {
+      n.style.animationDelay = `0s, ${(i * 0.7) % 4}s`;
+      n.dataset.bobDelay = `${(i * 0.7) % 4}s`;
+    });
+    const svg = document.getElementById('tethers');
+    const glitch = document.getElementById('glitch');
+    const lettersContainer = document.getElementById('letters');
+
+
+    let focusedIndex = 0;
+    let switchCount = 0;
+
+    const SCRAMBLE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#$%&';
+    const LETTER_W = 16;
+    const STAGGER = 60;
+    const TRAVEL_MS = 500;
+
+    function nodeCenter(node) {
+      const rect = node.getBoundingClientRect();
+      return {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2
+      };
+    }
+
+    let currentLetters = [];
+
+    function spawnLetters(text, center) {
+      lettersContainer.innerHTML = '';
+      currentLetters = [];
+      const totalW = (text.length - 1) * LETTER_W;
+      const startX = center.x - totalW / 2;
+      for (let i = 0; i < text.length; i++) {
+        const span = document.createElement('div');
+        span.className = 'letter';
+        span.textContent = text[i] === ' ' ? '\u00A0' : text[i];
+        span.style.left = (startX + i * LETTER_W) + 'px';
+        span.style.top = center.y + 'px';
+        lettersContainer.appendChild(span);
+        currentLetters.push(span);
+      }
+    }
+
+    spawnLetters(nodes[0].dataset.label, nodeCenter(nodes[0]));
+
+    function drawTether(fromNode, toNode) {
+      const a = nodeCenter(fromNode);
+      const b = nodeCenter(toNode);
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', a.x);
+      line.setAttribute('y1', a.y);
+      line.setAttribute('x2', b.x);
+      line.setAttribute('y2', b.y);
+      line.setAttribute('class', 'tether active');
+      svg.appendChild(line);
+      line.addEventListener('animationend', () => line.remove());
+    }
+
+    setInterval(() => {
+      if (Math.random() < 0.5) triggerGlitch();
+    }, 25000);
+
+    function triggerGlitch() {
+      const bandCount = 6;
+      const h = window.innerHeight;
+      for (let i = 0; i < bandCount; i++) {
+        const band = document.createElement('div');
+        band.className = 'glitch-band';
+        const top = Math.random() * h;
+        const height = 10 + Math.random() * 40;
+        const shift = (Math.random() - 0.5) * 60;
+        band.style.top = top + 'px';
+        band.style.height = height + 'px';
+        band.style.backgroundPosition = `${shift}px ${-top}px`;
+        band.style.transform = `translateX(${shift}px)`;
+        glitch.appendChild(band);
+      }
+      setTimeout(() => { glitch.innerHTML = ''; }, 120);
+    }
+
+    function travelLetters(newText, fromCenter, toCenter) {
+      const oldLetters = currentLetters;
+      const oldLen = oldLetters.length;
+      const newLen = newText.length;
+      const maxLen = Math.max(oldLen, newLen);
+
+      const totalW = (newLen - 1) * LETTER_W;
+      const startX = toCenter.x - totalW / 2;
+
+      const dirX = toCenter.x - fromCenter.x;
+      const dirY = toCenter.y - fromCenter.y;
+      const dist = Math.sqrt(dirX*dirX + dirY*dirY) || 1;
+      const nx = dirX / dist;
+      const ny = dirY / dist;
+
+      const newLetters = [];
+
+      for (let i = 0; i < maxLen; i++) {
+        let span;
+        if (i < oldLen) {
+          span = oldLetters[i];
+        } else {
+          span = document.createElement('div');
+          span.className = 'letter';
+          span.textContent = SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)];
+          const ox = fromCenter.x - i * nx * LETTER_W;
+          const oy = fromCenter.y - i * ny * LETTER_W;
+          span.style.left = ox + 'px';
+          span.style.top = oy + 'px';
+          span.style.opacity = '0';
+          lettersContainer.appendChild(span);
+          void span.offsetWidth;
+        }
+
+        const delay = i * STAGGER;
+
+        if (i < newLen) {
+          const tx = startX + i * LETTER_W;
+          const ty = toCenter.y;
+          newLetters.push(span);
+
+          setTimeout(() => {
+            span.style.transitionDelay = '0s';
+            span.style.opacity = '1';
+            span.style.left = tx + 'px';
+            span.style.top = ty + 'px';
+          }, delay);
+
+          setTimeout(() => {
+            let scrambleTicks = 0;
+            const scrambleInterval = setInterval(() => {
+              scrambleTicks++;
+              span.textContent = SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)];
+              if (scrambleTicks > 5) {
+                clearInterval(scrambleInterval);
+                span.textContent = newText[i] === ' ' ? '\u00A0' : newText[i];
+              }
+            }, TRAVEL_MS / 6);
+          }, delay);
+
+        } else {
+          const overshoot = (i - newLen + 1);
+          const tx = toCenter.x + nx * overshoot * LETTER_W;
+          const ty = toCenter.y + ny * overshoot * LETTER_W;
+
+          setTimeout(() => {
+            span.style.transitionDelay = '0s';
+            span.style.left = tx + 'px';
+            span.style.top = ty + 'px';
+            span.style.opacity = '0';
+          }, delay);
+
+          setTimeout(() => span.remove(), delay + TRAVEL_MS + 50);
+        }
+      }
+
+      currentLetters = newLetters;
+    }
+
+    function setFocus(index) {
+      window.webkit.messageHandlers.launch.postMessage("switch");
+      const prev = nodes[focusedIndex];
+      nodes[focusedIndex].classList.remove('focused');
+      focusedIndex = index;
+      const next = nodes[focusedIndex];
+      next.classList.add('focused');
+
+      const fromCenter = nodeCenter(prev);
+      const toCenter = nodeCenter(next);
+
+      drawTether(prev, next);
+
+      switchCount++;
+      if (switchCount % 10 === 0) triggerGlitch();
+
+      travelLetters(next.dataset.label, fromCenter, toCenter);
+    }
+
+    function nearestInDirection(dx, dy) {
+      const current = nodes[focusedIndex];
+      const cx = parseFloat(current.dataset.x);
+      const cy = parseFloat(current.dataset.y);
+      let best = -1;
+      let bestScore = Infinity;
+
+      nodes.forEach((n, i) => {
+        if (i === focusedIndex) return;
+        const nx = parseFloat(n.dataset.x);
+        const ny = parseFloat(n.dataset.y);
+        const vx = nx - cx;
+        const vy = ny - cy;
+        const dot = vx * dx + vy * dy;
+        if (dot <= 0) return;
+        const dist = Math.sqrt(vx*vx + vy*vy);
+        const score = dist / dot;
+        if (score < bestScore) {
+          bestScore = score;
+          best = i;
+        }
+      });
+      return best;
+    }
+
+    let musicStarted = false;
+    document.getElementById("bgmusic").play().catch(()=>{});
+    musicStarted = true;
+    let isShattering = false;
+    function shatterNode(node) {
+      window.webkit.messageHandlers.launch.postMessage("open");
+      if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.launch) {
+        window.webkit.messageHandlers.launch.postMessage(node.dataset.label);
+      }
+      if (isShattering) return;
+      isShattering = true;
+      const rect = node.getBoundingClientRect();
+      const pillCanvas = node.querySelector('.pillcanvas');
+      const flashCanvas = node.querySelector('.flash-canvas');
+      const cw = pillCanvas.width;
+      const ch = pillCanvas.height;
+
+      const fullCanvas = document.createElement('canvas');
+      fullCanvas.width = cw;
+      fullCanvas.height = ch;
+      const fctx = fullCanvas.getContext('2d');
+      fctx.drawImage(pillCanvas, 0, 0);
+      const flashOpacity = parseFloat(getComputedStyle(flashCanvas).opacity) || 0;
+      if (flashOpacity > 0) {
+        fctx.globalAlpha = flashOpacity;
+        fctx.drawImage(flashCanvas, 0, 0);
+        fctx.globalAlpha = 1;
+      }
+
+      lettersContainer.style.visibility = 'hidden';
+
+      const clipShapes = [
+        'polygon(0% 0%, 100% 0%, 50% 50%)',
+        'polygon(100% 0%, 100% 100%, 50% 50%)',
+        'polygon(100% 100%, 0% 100%, 50% 50%)',
+        'polygon(0% 100%, 0% 0%, 50% 50%)'
+      ];
+      const shardSides = ['left', 'right', 'right', 'left'];
+
+      const screenCenterX = window.innerWidth / 2;
+      const screenCenterY = window.innerHeight / 2;
+      const pieceCenterX = rect.left + rect.width / 2;
+      const pieceCenterY = rect.top + rect.height / 2;
+      const toCenterX = screenCenterX - pieceCenterX;
+      const toCenterY = screenCenterY - pieceCenterY;
+
+      // Step 1: progressively remove pieces from the live node, one per step
+      node.style.transition = 'none';
+      node.style.animation = 'none';
+      pillCanvas.style.transition = 'none';
+      flashCanvas.style.transition = 'none';
+      flashCanvas.style.animation = 'none';
+      flashCanvas.style.opacity = '0';
+
+      // After each step, the node shows only the REMAINING (not-yet-broken-off) area
+      const remainingShapes = [
+        'polygon(50% 50%, 100% 0%, 100% 100%, 0% 100%, 0% 0%)', // top piece removed
+        'polygon(50% 50%, 0% 0%, 0% 100%, 0% 100%)',             // top+right removed -> left+bottom remain
+        'polygon(0% 0%, 0% 0%, 0% 0%)'                           // everything removed
+      ];
+
+      const stepDelay = 180;
+      remainingShapes.forEach((shape, s) => {
+        setTimeout(() => {
+          pillCanvas.style.clipPath = shape;
+          pillCanvas.style.webkitClipPath = shape;
+          flashCanvas.style.clipPath = shape;
+          flashCanvas.style.webkitClipPath = shape;
+        }, s * stepDelay);
+      });
+
+      setTimeout(() => {
+        node.style.visibility = 'hidden';
+      }, remainingShapes.length * stepDelay);
+
+      // Step 2: spawn shards staggered to match cutouts
+      clipShapes.forEach((clip, i) => {
+        setTimeout(() => {
+        const shard = document.createElement('div');
+        shard.className = 'shard';
+        const shardCanvas = document.createElement('canvas');
+        shardCanvas.width = cw;
+        shardCanvas.height = ch;
+        shardCanvas.getContext('2d').drawImage(fullCanvas, 0, 0);
+
+        shard.appendChild(shardCanvas);
+        shard.style.width = rect.width + 'px';
+        shard.style.height = rect.height + 'px';
+        shard.style.left = rect.left + 'px';
+        shard.style.top = rect.top + 'px';
+        shard.style.clipPath = clip;
+        shard.style.webkitClipPath = clip;
+        shard.style.filter = 'contrast(1.15) brightness(1.05) drop-shadow(0 0 1px rgba(0,0,0,0.7))';
+        shardCanvas.style.width = '100%';
+        shardCanvas.style.height = '100%';
+        document.body.appendChild(shard);
+        void shard.offsetWidth;
+
+        const side = shardSides[i];
+        const dirX = side === 'left' ? -1 : 1;
+        const verticalSpread = (i === 0 || i === 2) ? -180 : 180;
+        const finalX = toCenterX + dirX * (window.innerWidth * 1.2);
+        const finalY = toCenterY + verticalSpread + (Math.random() - 0.5) * 60;
+        const rot = dirX * (20 + Math.random() * 30) + verticalSpread * 0.15;
+
+        requestAnimationFrame(() => {
+          shard.style.transition = 'transform 0.25s ease-in';
+          shard.style.transform = `translate(${toCenterX}px, ${toCenterY}px) scale(2.2) rotate(${rot * 0.2}deg)`;
+        });
+
+        setTimeout(() => {
+          shard.style.transition = 'transform 1.1s cubic-bezier(.3,0,.7,1), opacity 0.4s ease 0.7s';
+          shard.style.transform = `translate(${finalX}px, ${finalY}px) scale(1.3) rotate(${rot}deg)`;
+          shard.style.opacity = '0';
+        }, 250);
+
+        setTimeout(() => shard.remove(), 1400);
+        }, i * 180);
+      });
+
+      // Step 3: restore the node after shards are done
+      setTimeout(() => {
+        node.style.transition = 'none';
+        node.style.opacity = '1';
+        node.style.visibility = 'visible';
+        pillCanvas.style.clipPath = '';
+        pillCanvas.style.webkitClipPath = '';
+        flashCanvas.style.clipPath = '';
+        flashCanvas.style.webkitClipPath = '';
+        lettersContainer.style.visibility = 'visible';
+        void node.offsetWidth;
+        node.style.transition = 'transform 0.8s ease-out';
+        node.style.animation = '';
+        flashCanvas.style.animation = '';
+        flashCanvas.style.opacity = '';
+        isShattering = false;
+      }, 1450);
+    }
+
+    let lastTrail = 0;
+    document.addEventListener('mousemove', (e) => {
+      const now = Date.now();
+      if (now - lastTrail < 60) return;
+      lastTrail = now;
+      const dot = document.createElement('div');
+      dot.className = 'cursor-trail';
+      dot.style.left = e.clientX + 'px';
+      dot.style.top = e.clientY + 'px';
+      document.body.appendChild(dot);
+      dot.addEventListener('animationend', () => dot.remove());
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        shatterNode(nodes[focusedIndex]);
+        return;
+      }
+      if (!musicStarted) { document.getElementById("bgmusic").play(); musicStarted = true; }
+      let dx = 0, dy = 0;
+      if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') dx = 1;
+      else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') dx = -1;
+      else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') dy = 1;
+      else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') dy = -1;
+      else return;
+
+      const next = nearestInDirection(dx, dy);
+      if (next !== -1) setFocus(next);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html><head><style>
+html, body { margin:0; padding:0; background:transparent; overflow:hidden; width:100%; height:100%; }
+#panel {
+  position: fixed; top: 16px; left: 16px;
+  background: rgba(10, 21, 48, 0.75);
+  border: 1px solid rgba(126, 200, 212, 0.6);
+  border-radius: 4px;
+  box-shadow: 0 0 16px rgba(126,200,212,0.25);
+  padding: 10px 14px;
+  min-width: 200px;
+}
+#panel .title {
+  font-family: 'Love Letter Typewriter', monospace;
+  font-size: 10px;
+  color: #9fe8f0;
+  opacity: 0.7;
+  letter-spacing: 2px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid rgba(126,200,212,0.3);
+  padding-bottom: 4px;
+}
+#log {
+  font-family: 'Liberation Mono', monospace;
+  font-size: 12px;
+  color: #7ec8d4;
+  text-shadow: 1px 1px 0 #1c2454;
+  opacity: 0.85;
+  line-height: 1.6;
+  white-space: pre;
+}
+.line {
+  opacity: 0;
+  animation: lineIn 0.4s ease-out forwards;
+}
+@keyframes lineIn {
+  0% { opacity: 0; transform: translateX(-8px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+</style></head>
+<body>
+  <div id="panel">
+    <div class="title">SYSTEM</div>
+    <div id="log"></div>
+  </div>
+<script>
+const logEl = document.getElementById('log');
+const MAX_LINES = 7;
+let lines = [];
+
+window.pushLine = (text) => {
+  const span = document.createElement('div');
+  span.className = 'line';
+  span.textContent = text;
+  logEl.appendChild(span);
+  lines.push(span);
+  if (lines.length > MAX_LINES) {
+    const old = lines.shift();
+    old.remove();
+  }
+};
+
+window.updateLastLine = (text) => {
+  if (lines.length > 0) {
+    lines[lines.length - 1].textContent = text;
+  } else {
+    pushLine(text);
+  }
+};
+</script>
+</body></html>

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html><head><style>
+html, body { margin:0; padding:0; background:transparent; overflow:hidden; width:100%; height:100%;
+  display:flex; align-items:flex-end; justify-content:center; padding-bottom: 40px; box-sizing: border-box; }
+@keyframes nodeEntrance {
+  0% { opacity: 0; transform: scale(0.3); }
+  60% { opacity: 1; transform: scale(1.15); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.node {
+  position: relative;
+  width: 200px; height: 90px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border-radius: 50%;
+  filter: drop-shadow(0 0 0px rgba(160,200,255,0)) drop-shadow(0 0 0px rgba(120,170,255,0));
+  opacity: 0;
+  transform: scale(0.3);
+  transition: opacity 0.2s ease 0.15s, transform 0.2s ease 0.15s, filter 0.15s ease-in;
+}
+.node.visible {
+  opacity: 1;
+  transform: scale(1);
+  filter: drop-shadow(0 0 18px rgba(160,200,255,1)) drop-shadow(0 0 36px rgba(120,170,255,0.9));
+  animation: nodeEntrance 0.35s ease-out;
+  transition: filter 0.4s ease-out 0.15s;
+}
+.node canvas {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+}
+#content {
+  position: relative; z-index: 1;
+  font-family: 'Love Letter Typewriter', monospace;
+  color: #eaf0ff;
+  text-align: center;
+  text-shadow: 1px 1px 0 #1c2454, 2px 2px 0 #141a3a;
+}
+#label { font-size: 10px; opacity: 0.7; margin-bottom: 2px; letter-spacing: 2px; }
+#pct { font-size: 18px; margin-bottom: 6px; }
+#bar-track {
+  width: 120px; height: 6px;
+  background: rgba(20,30,80,0.6);
+  border-radius: 3px;
+  overflow: hidden;
+}
+#bar-fill {
+  height: 100%;
+  background: #eaf0ff;
+  border-radius: 3px;
+  transition: width 0.1s ease;
+  box-shadow: 0 0 8px rgba(234,240,255,0.6);
+}
+</style></head>
+<body>
+  <div class="node" id="node">
+    <canvas class="pillcanvas" width="200" height="90"></canvas>
+    <div id="content">
+      <div id="label">VOL</div>
+      <div id="pct">50%</div>
+      <div id="bar-track"><div id="bar-fill" style="width:50%"></div></div>
+    </div>
+  </div>
+<script>
+document.querySelectorAll('.pillcanvas').forEach(c => {
+  const ctx = c.getContext('2d');
+  const w = c.width, h = c.height, cx = w/2, cy = h/2, rx = w/2, ry = h/2;
+  const grad = ctx.createRadialGradient(cx-rx*0.3, cy-ry*0.35, 2, cx, cy, rx*0.92);
+  grad.addColorStop(0, '#9fb6f2'); grad.addColorStop(0.45, '#6f86d6'); grad.addColorStop(1, '#3a4ea0');
+  ctx.fillStyle = grad;
+  ctx.beginPath(); ctx.ellipse(cx, cy, rx*0.85, ry*0.8, 0, 0, Math.PI*2); ctx.fill();
+  ctx.globalCompositeOperation = 'overlay';
+  function shineDot(sx, sy, size, alpha) {
+    const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, size);
+    g.addColorStop(0, 'rgba(255,255,255,' + alpha + ')');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(sx, sy, size, 0, Math.PI*2); ctx.fill();
+  }
+  shineDot(cx - rx*0.4, cy - ry*0.45, 8, 0.5);
+  shineDot(cx + rx*0.5, cy - ry*0.2, 7, 0.4);
+  shineDot(cx - rx*0.1, cy + ry*0.5, 7, 0.35);
+  ctx.globalCompositeOperation = 'source-over';
+});
+
+let hideTimer = null;
+window.setVolume = (pct, muted) => {
+  const node = document.getElementById('node');
+  const fill = document.getElementById('bar-fill');
+  document.getElementById('pct').textContent = muted ? 'MUTED' : (pct + '%');
+  fill.style.width = (muted ? 0 : pct) + '%';
+  node.classList.add('visible');
+  if (hideTimer) clearTimeout(hideTimer);
+  hideTimer = setTimeout(() => node.classList.remove('visible'), 1500);
+};
+</script>
+</body></html>

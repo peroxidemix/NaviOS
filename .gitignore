@@ -1,0 +1,6 @@
+*.bak
+*.bak2
+frames_*.png
+rev_*_dup.png
+__pycache__/
+*.pyc

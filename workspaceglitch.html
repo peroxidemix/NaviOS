@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html><head><style>
+html, body { margin:0; padding:0; background:transparent; overflow:hidden; width:100%; height:100%; }
+#glitch {
+  position: fixed; inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.glitch-band {
+  position: absolute; left: 0; right: 0;
+  mix-blend-mode: screen;
+}
+.band-cyan { background: rgba(160, 220, 255, 0.4); }
+.band-violet { background: rgba(126, 168, 255, 0.3); }
+.band-deep { background: rgba(58, 78, 160, 0.35); }
+.band-teal { background: rgba(126, 200, 212, 0.3); }
+#scanlines {
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255,255,255,0.06) 0px,
+    rgba(255,255,255,0.06) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  opacity: 0;
+  mix-blend-mode: overlay;
+}
+#noise {
+  position: fixed; inset: 0;
+  opacity: 0;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+@keyframes flicker {
+  0% { opacity: 0.6; }
+  30% { opacity: 0.1; }
+  60% { opacity: 0.5; }
+  100% { opacity: 0; }
+}
+.flicker { animation: flicker 0.15s linear forwards; }
+</style></head>
+<body>
+  <div id="scanlines"></div>
+  <div id="noise"></div>
+  <div id="glitch"></div>
+<script>
+const glitchEl = document.getElementById('glitch');
+const scanlines = document.getElementById('scanlines');
+const noise = document.getElementById('noise');
+
+window.triggerGlitch = () => {
+  const h = window.innerHeight;
+
+  // Color bands with random offsets
+  const colors = ['band-cyan', 'band-violet', 'band-deep', 'band-teal'];
+  const bandCount = 8 + Math.floor(Math.random() * 5);
+  for (let i = 0; i < bandCount; i++) {
+    const band = document.createElement('div');
+    band.className = 'glitch-band ' + colors[Math.floor(Math.random() * colors.length)];
+    const top = Math.random() * h;
+    const height = 4 + Math.random() * 50;
+    const shift = (Math.random() - 0.5) * 100;
+    band.style.top = top + 'px';
+    band.style.height = height + 'px';
+    band.style.transform = `translateX(${shift}px)`;
+    glitchEl.appendChild(band);
+  }
+
+  // Scanline flicker
+  scanlines.classList.remove('flicker');
+  void scanlines.offsetWidth;
+  scanlines.classList.add('flicker');
+
+  // Noise flicker
+  noise.classList.remove('flicker');
+  void noise.offsetWidth;
+  noise.classList.add('flicker');
+
+  setTimeout(() => { glitchEl.innerHTML = ''; }, 150);
+};
+</script>
+</body></html>

@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; padding: 0; overflow: hidden; background: transparent; height: 100%; }
+  @keyframes nodeExit {
+    0% { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+    40% { opacity: 1; transform: translate(-50%,-50%) scale(1.08); }
+    100% { opacity: 0; transform: translate(-50%,-50%) scale(0.2); }
+  }
+  .exiting {
+    animation: nodeExit 0.3s cubic-bezier(0.4, 0, 0.6, 1) forwards !important;
+  }
+  @keyframes nodeEntrance {
+    0% { opacity: 0; transform: translate(-50%,-50%) scale(0.3); }
+    60% { opacity: 1; transform: translate(-50%,-50%) scale(1.15); }
+    100% { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+  }
+  .node {
+    transition: transform 0.2s ease-out, opacity 0.2s ease-out;
+    position: fixed; z-index: 2;
+    width: 165px; height: 95px;
+    image-rendering: pixelated;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    animation: glow 2.4s ease-in-out infinite, nodeEntrance 0.35s ease-out;
+    transform: translate(-50%,-50%) scale(1);
+    transition: transform 0.2s ease-out, opacity 0.2s ease-out;
+  }
+  @keyframes glow {
+    0%, 100% { filter: drop-shadow(0 0 10px rgba(90,140,230,0.7)); }
+    50% { filter: drop-shadow(0 0 28px rgba(90,140,230,1)); }
+  }
+  .node.focused {
+    animation: glowFocused 1.2s ease-in-out infinite, nodeEntrance 0.35s ease-out;
+    transform: translate(-50%,-50%) scale(1.12);
+  }
+  @keyframes glowFocused {
+    0%, 100% { filter: drop-shadow(0 0 14px rgba(160,200,255,1)) drop-shadow(0 0 28px rgba(120,170,255,0.9)); }
+    50% { filter: drop-shadow(0 0 24px rgba(180,215,255,1)) drop-shadow(0 0 48px rgba(120,170,255,1)); }
+  }
+  .node canvas {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    image-rendering: pixelated;
+  }
+  .node .flash-canvas { opacity: 0; }
+  .node.focused .flash-canvas { animation: flashGreen 1.2s ease-in-out infinite; }
+  @keyframes flashGreen {
+    0%, 100% { opacity: 0; }
+    50% { opacity: 0.85; }
+  }
+  @keyframes dimIn {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+  }
+  #dimmer {
+    position: fixed; inset: 0; z-index: 0;
+    background: radial-gradient(circle at center, rgba(10,15,40,0.0) 0%, rgba(5,8,20,0.45) 75%);
+    animation: dimIn 0.3s ease-out;
+    pointer-events: none;
+  }
+  #glitch {
+    position: fixed; inset: 0; z-index: 5; pointer-events: none;
+    overflow: hidden;
+  }
+  .glitch-band {
+    position: absolute; left: 0; right: 0;
+    background: rgba(160, 220, 255, 0.5);
+    mix-blend-mode: screen;
+  }
+  .letter {
+    position: fixed;
+    z-index: 3;
+    transform: translate(-50%, -50%);
+    font-family: 'Love Letter Typewriter', monospace;
+    color: #9fe8f0;
+    font-size: 13px;
+    text-shadow: 1px 1px 0 #1c2454, 2px 2px 0 #141a3a;
+    pointer-events: none;
+    transition: left 0.4s ease-in-out, top 0.4s ease-in-out, opacity 0.2s ease;
+  }
+  #status-label {
+    display: none;
+    position: fixed; left: 50%; top: calc(50% + 50px);
+    transform: translateX(-50%);
+    z-index: 3;
+    font-family: 'Love Letter Typewriter', monospace;
+    font-size: 13px;
+    color: #9fe8f0;
+    text-shadow: 1px 1px 0 #1c2454, 2px 2px 0 #141a3a;
+    opacity: 0.85;
+    transition: opacity 0.15s ease;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  .tether {
+    stroke: #7ea8ff;
+    stroke-width: 2;
+    fill: none;
+    opacity: 0;
+    filter: drop-shadow(0 0 4px rgba(126,168,255,0.9));
+  }
+  @keyframes tetherFade {
+    0% { opacity: 0; }
+    15% { opacity: 1; }
+    70% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+  .tether.active {
+    animation: tetherFade 0.8s ease-out forwards;
+  }
+  .shard {
+    position: fixed;
+    z-index: 6;
+    pointer-events: none;
+    image-rendering: pixelated;
+    overflow: hidden;
+    transition: transform 0.9s cubic-bezier(.3,0,.7,1), opacity 0.3s ease 0.6s;
+  }
+  .label-text {
+    position: relative; z-index: 3; color: #eaf0ff;
+    font-family: 'Love Letter Typewriter', monospace; font-size: 14px;
+    text-shadow: 1px 1px 0 #1c2454, 2px 2px 0 #141a3a;
+  }
+  .node.center {
+    width: 60px; height: 60px;
+  }
+</style>
+</head>
+<body>
+  <div id="dimmer"></div>
+  <div id="glitch"></div>
+  <div id="status-label" style="display:none;">ready</div>
+  <div id="letters"></div>
+  <svg id="tethers" style="position:fixed; top:0; left:0; width:100vw; height:100vh; z-index:1; pointer-events:none;"></svg>
+  <div class="node center focused" data-label="" data-x="50" data-y="50" style="left:50%; top:50%;">
+    <canvas class="pillcanvas" width="60" height="60"></canvas>
+  </div>
+  <div class="node" data-label="terminal" data-x="50" data-y="20" style="left:50%; top:calc(50% - 170px);">
+    <canvas class="pillcanvas" width="165" height="95"></canvas>
+    <canvas class="flash-canvas" width="165" height="95"></canvas>
+    <span class="label-text">terminal</span>
+  </div>
+  <div class="node" data-label="browser" data-x="50" data-y="80" style="left:50%; top:calc(50% + 170px);">
+    <canvas class="pillcanvas" width="165" height="95"></canvas>
+    <canvas class="flash-canvas" width="165" height="95"></canvas>
+    <span class="label-text">browser</span>
+  </div>
+  <div class="node" data-label="files" data-x="20" data-y="50" style="left:calc(50% - 220px); top:50%;">
+    <canvas class="pillcanvas" width="165" height="95"></canvas>
+    <canvas class="flash-canvas" width="165" height="95"></canvas>
+    <span class="label-text">files</span>
+  </div>
+  <div class="node" data-label="spotify" data-x="80" data-y="50" style="left:calc(50% + 220px); top:50%;">
+    <canvas class="pillcanvas" width="165" height="95"></canvas>
+    <canvas class="flash-canvas" width="165" height="95"></canvas>
+    <span class="label-text">spotify</span>
+  </div>
+  <div class="node" data-label="ryujinx" data-x="73" data-y="27" style="left:calc(50% + 155px); top:calc(50% - 120px);">
+    <canvas class="pillcanvas" width="165" height="95"></canvas>
+    <canvas class="flash-canvas" width="165" height="95"></canvas>
+    <span class="label-text">ryujinx</span>
+  </div>
+  <div class="node" data-label="bluetooth" data-x="27" data-y="73" style="left:calc(50% - 155px); top:calc(50% + 120px);">
+    <canvas class="pillcanvas" width="165" height="95"></canvas>
+    <canvas class="flash-canvas" width="165" height="95"></canvas>
+    <span class="label-text">bluetooth</span>
+  </div>
+<script>
+document.querySelectorAll('.pillcanvas').forEach(c => {
+  const ctx = c.getContext('2d');
+  const w = c.width, h = c.height, cx = w/2, cy = h/2, rx = w/2, ry = h/2;
+  const grad = ctx.createRadialGradient(cx-rx*0.3, cy-ry*0.35, 2, cx, cy, rx*0.92);
+  grad.addColorStop(0, '#9fb6f2'); grad.addColorStop(0.45, '#6f86d6'); grad.addColorStop(1, '#3a4ea0');
+  ctx.fillStyle = grad;
+  ctx.beginPath(); ctx.ellipse(cx, cy, rx*0.85, ry*0.8, 0, 0, Math.PI*2); ctx.fill();
+  ctx.globalCompositeOperation = 'overlay';
+  function shineDot(sx, sy, size, alpha) {
+    const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, size);
+    g.addColorStop(0, 'rgba(255,255,255,' + alpha + ')');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(sx, sy, size, 0, Math.PI*2); ctx.fill();
+  }
+  shineDot(cx - rx*0.4, cy - ry*0.45, 8, 0.5);
+  shineDot(cx + rx*0.5, cy - ry*0.2, 7, 0.4);
+  shineDot(cx - rx*0.1, cy + ry*0.5, 7, 0.35);
+  ctx.globalCompositeOperation = 'source-over';
+});
+document.querySelectorAll('.flash-canvas').forEach(c => {
+  const ctx = c.getContext('2d');
+  const w = c.width, h = c.height, cx = w/2, cy = h/2, rx = w/2, ry = h/2;
+  const grad = ctx.createRadialGradient(cx-rx*0.3, cy-ry*0.35, 2, cx, cy, rx*0.92);
+  grad.addColorStop(0, '#c8ffd9'); grad.addColorStop(0.45, '#6fe0a0'); grad.addColorStop(1, '#1f8a4f');
+  ctx.fillStyle = grad;
+  ctx.beginPath(); ctx.ellipse(cx, cy, rx*0.85, ry*0.8, 0, 0, Math.PI*2); ctx.fill();
+});
+
+const center = document.querySelector('.node.center');
+const nodes = {
+  terminal: document.querySelector('.node[data-label="terminal"]'),
+  browser: document.querySelector('.node[data-label="browser"]'),
+  files: document.querySelector('.node[data-label="files"]'),
+  spotify: document.querySelector('.node[data-label="spotify"]'),
+  ryujinx: document.querySelector('.node[data-label="ryujinx"]'),
+  bluetooth: document.querySelector('.node[data-label="bluetooth"]')
+};
+let pos = "center";
+const allEls = { center: center, ...nodes };
+function nearestInDirection(dx, dy) {
+  const cx = parseFloat(allEls[pos].dataset.x);
+  const cy = parseFloat(allEls[pos].dataset.y);
+  let best = null;
+  let bestScore = Infinity;
+  for (const [label, el] of Object.entries(allEls)) {
+    if (label === pos) continue;
+    const nx = parseFloat(el.dataset.x);
+    const ny = parseFloat(el.dataset.y);
+    const vx = nx - cx;
+    const vy = ny - cy;
+    const dot = vx * dx + vy * dy;
+    if (dot <= 0) continue;
+    const dist = Math.sqrt(vx*vx + vy*vy);
+    const score = dist / dot;
+    if (score < bestScore) { bestScore = score; best = label; }
+  }
+  return best;
+}
+
+const statusLabel = document.getElementById('status-label');
+function setFocus() {
+  center.classList.toggle('focused', pos === "center");
+  for (const [label, el] of Object.entries(nodes)) {
+    el.classList.toggle('focused', pos === label);
+  }
+  const oldPos = window.__lastPos || "center";
+  const fromEl = oldPos === "center" ? center : nodes[oldPos];
+  const toEl = pos === "center" ? center : nodes[pos];
+  const fromC = nodeCenter(fromEl);
+  const toC = { x: nodeCenter(toEl).x, y: nodeCenter(toEl).y + 60 };
+  const newText = pos === "center" ? "ready" : ("open " + pos);
+  travelLetters(newText, fromC, toC);
+  window.__lastPos = pos;
+}
+
+const glitchEl = document.getElementById('glitch');
+function triggerGlitch() {
+  const bandCount = 5;
+  const h = window.innerHeight;
+  for (let i = 0; i < bandCount; i++) {
+    const band = document.createElement('div');
+    band.className = 'glitch-band';
+    const top = Math.random() * h;
+    const height = 6 + Math.random() * 30;
+    const shift = (Math.random() - 0.5) * 40;
+    band.style.top = top + 'px';
+    band.style.height = height + 'px';
+    band.style.transform = `translateX(${shift}px)`;
+    glitchEl.appendChild(band);
+  }
+  setTimeout(() => { glitchEl.innerHTML = ''; }, 100);
+}
+triggerGlitch();
+
+const lettersContainer = document.getElementById('letters');
+const SCRAMBLE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#$%&';
+const LETTER_W = 12;
+const STAGGER = 40;
+const TRAVEL_MS = 350;
+let currentLetters = [];
+function travelLetters(newText, fromCenter, toCenter) {
+  const oldLetters = currentLetters;
+  const oldLen = oldLetters.length;
+  const newLen = newText.length;
+  const maxLen = Math.max(oldLen, newLen);
+  const totalW = (newLen - 1) * LETTER_W;
+  const startX = toCenter.x - totalW / 2;
+  const dirX = toCenter.x - fromCenter.x;
+  const dirY = toCenter.y - fromCenter.y;
+  const dist = Math.sqrt(dirX*dirX + dirY*dirY) || 1;
+  const nx = dirX / dist;
+  const ny = dirY / dist;
+  const newLetters = [];
+  for (let i = 0; i < maxLen; i++) {
+    let span;
+    if (i < oldLen) {
+      span = oldLetters[i];
+    } else {
+      span = document.createElement('div');
+      span.className = 'letter';
+      span.textContent = SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)];
+      const ox = fromCenter.x - i * nx * LETTER_W;
+      const oy = fromCenter.y - i * ny * LETTER_W;
+      span.style.left = ox + 'px';
+      span.style.top = oy + 'px';
+      span.style.opacity = '0';
+      lettersContainer.appendChild(span);
+      void span.offsetWidth;
+    }
+    const delay = i * STAGGER;
+    if (i < newLen) {
+      const tx = startX + i * LETTER_W;
+      const ty = toCenter.y;
+      newLetters.push(span);
+      setTimeout(() => {
+        span.style.opacity = '1';
+        span.style.left = tx + 'px';
+        span.style.top = ty + 'px';
+      }, delay);
+      setTimeout(() => {
+        let ticks = 0;
+        const iv = setInterval(() => {
+          ticks++;
+          span.textContent = SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)];
+          if (ticks > 4) {
+            clearInterval(iv);
+            span.textContent = newText[i] === ' ' ? '\u00A0' : newText[i];
+          }
+        }, TRAVEL_MS / 5);
+      }, delay);
+    } else {
+      const overshoot = (i - newLen + 1);
+      const tx = toCenter.x + nx * overshoot * LETTER_W;
+      const ty = toCenter.y + ny * overshoot * LETTER_W;
+      setTimeout(() => {
+        span.style.left = tx + 'px';
+        span.style.top = ty + 'px';
+        span.style.opacity = '0';
+      }, delay);
+      setTimeout(() => span.remove(), delay + TRAVEL_MS + 50);
+    }
+  }
+  currentLetters = newLetters;
+}
+spawnInitial();
+function spawnInitial() {
+  const c = nodeCenter(center);
+  const text = "ready";
+  const totalW = (text.length - 1) * LETTER_W;
+  const startX = c.x - totalW / 2;
+  for (let i = 0; i < text.length; i++) {
+    const span = document.createElement('div');
+    span.className = 'letter';
+    span.textContent = text[i];
+    span.style.left = (startX + i * LETTER_W) + 'px';
+    span.style.top = (c.y + 60) + 'px';
+    lettersContainer.appendChild(span);
+    currentLetters.push(span);
+  }
+}
+
+const tethersSvg = document.getElementById('tethers');
+function nodeCenter(el) {
+  const rect = el.getBoundingClientRect();
+  return { x: rect.left + rect.width/2, y: rect.top + rect.height/2 };
+}
+function drawTether(fromEl, toEl) {
+  const a = nodeCenter(fromEl);
+  const b = nodeCenter(toEl);
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  line.setAttribute('x1', a.x);
+  line.setAttribute('y1', a.y);
+  line.setAttribute('x2', b.x);
+  line.setAttribute('y2', b.y);
+  line.setAttribute('class', 'tether active');
+  tethersSvg.appendChild(line);
+  line.addEventListener('animationend', () => line.remove());
+}
+
+document.addEventListener('keydown', e => {
+  let dx = 0, dy = 0;
+  if (e.key === 'w' || e.key === 'W') dy = -1;
+  else if (e.key === 's' || e.key === 'S') dy = 1;
+  else if (e.key === 'a' || e.key === 'A') dx = -1;
+  else if (e.key === 'd' || e.key === 'D') dx = 1;
+  else return;
+
+  const target = nearestInDirection(dx, dy);
+  if (!target) return;
+
+  const fromEl = allEls[pos];
+  const toEl = allEls[target];
+  drawTether(fromEl, toEl);
+  pos = target;
+  window.webkit.messageHandlers.launch.postMessage("switch");
+  setFocus();
+});
+
+function shatterNode(node) {
+  const rect = node.getBoundingClientRect();
+  const pillCanvas = node.querySelector('.pillcanvas');
+  if (!pillCanvas) return;
+  const cw = pillCanvas.width, ch = pillCanvas.height;
+
+  const fullCanvas = document.createElement('canvas');
+  fullCanvas.width = cw; fullCanvas.height = ch;
+  fullCanvas.getContext('2d').drawImage(pillCanvas, 0, 0);
+
+  const clipShapes = [
+    'polygon(0% 0%, 100% 0%, 50% 50%)',
+    'polygon(100% 0%, 100% 100%, 50% 50%)',
+    'polygon(100% 100%, 0% 100%, 50% 50%)',
+    'polygon(0% 100%, 0% 0%, 50% 50%)'
+  ];
+  const shardSides = ['left', 'right', 'right', 'left'];
+  const screenCenterX = window.innerWidth / 2;
+  const screenCenterY = window.innerHeight / 2;
+  const pieceCenterX = rect.left + rect.width / 2;
+  const pieceCenterY = rect.top + rect.height / 2;
+  const toCenterX = screenCenterX - pieceCenterX;
+  const toCenterY = screenCenterY - pieceCenterY;
+
+  clipShapes.forEach((clip, i) => {
+    setTimeout(() => {
+      const shard = document.createElement('div');
+      shard.className = 'shard';
+      const shardCanvas = document.createElement('canvas');
+      shardCanvas.width = cw; shardCanvas.height = ch;
+      shardCanvas.getContext('2d').drawImage(fullCanvas, 0, 0);
+      shard.appendChild(shardCanvas);
+      shard.style.width = rect.width + 'px';
+      shard.style.height = rect.height + 'px';
+      shard.style.left = rect.left + 'px';
+      shard.style.top = rect.top + 'px';
+      shard.style.clipPath = clip;
+      shard.style.webkitClipPath = clip;
+      shard.style.filter = 'contrast(1.15) brightness(1.05) drop-shadow(0 0 1px rgba(0,0,0,0.7))';
+      shardCanvas.style.width = '100%';
+      shardCanvas.style.height = '100%';
+      document.body.appendChild(shard);
+      void shard.offsetWidth;
+
+      const side = shardSides[i];
+      const dirX = side === 'left' ? -1 : 1;
+      const verticalSpread = (i === 0 || i === 2) ? -180 : 180;
+      const finalX = toCenterX + dirX * (window.innerWidth * 2.5);
+      const finalY = toCenterY + verticalSpread * 3 + (Math.random() - 0.5) * 200;
+      const rot = dirX * (60 + Math.random() * 120) + verticalSpread * 0.3;
+
+      requestAnimationFrame(() => {
+        shard.style.transition = 'transform 0.25s ease-in';
+        shard.style.transform = `translate(${toCenterX}px, ${toCenterY}px) scale(2.2) rotate(${rot * 0.1}deg)`;
+      });
+      setTimeout(() => {
+        shard.style.transition = 'transform 2.2s cubic-bezier(.2,0,.6,1), opacity 0.6s ease 1.8s';
+        shard.style.transform = `translate(${finalX}px, ${finalY}px) scale(1.5) rotate(${rot}deg)`;
+        shard.style.opacity = '0';
+      }, 250);
+      setTimeout(() => shard.remove(), 2700);
+    }, i * 100);
+  });
+}
+
+window.confirmSelection = () => {
+  if (pos !== "center") {
+    const activeEl = nodes[pos];
+    if (activeEl) shatterNode(activeEl);
+  }
+  document.querySelectorAll('.node').forEach(n => n.classList.add('exiting'));
+  document.getElementById('dimmer').style.opacity = '0';
+  document.getElementById('dimmer').style.transition = 'opacity 0.25s ease';
+  document.getElementById('status-label').style.opacity = '0';
+  const result = pos === "center" ? "close" : pos;
+  setTimeout(() => {
+    window.webkit.messageHandlers.launch.postMessage(result);
+  }, 280);
+};
+</script>
+</body></html>
