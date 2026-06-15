@@ -52,7 +52,6 @@ const noise = document.getElementById('noise');
 window.triggerGlitch = () => {
   const h = window.innerHeight;
 
-  // Color bands with random offsets
   const colors = ['band-cyan', 'band-violet', 'band-deep', 'band-teal'];
   const bandCount = 8 + Math.floor(Math.random() * 5);
   for (let i = 0; i < bandCount; i++) {
@@ -67,12 +66,10 @@ window.triggerGlitch = () => {
     glitchEl.appendChild(band);
   }
 
-  // Scanline flicker
   scanlines.classList.remove('flicker');
   void scanlines.offsetWidth;
   scanlines.classList.add('flicker');
 
-  // Noise flicker
   noise.classList.remove('flicker');
   void noise.offsetWidth;
   noise.classList.add('flicker');
