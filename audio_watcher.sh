@@ -9,7 +9,7 @@ import subprocess, json, time
 
 clients = json.loads(subprocess.run(["hyprctl", "clients", "-j"], capture_output=True, text=True).stdout)
 active_ws = json.loads(subprocess.run(["hyprctl", "activeworkspace", "-j"], capture_output=True, text=True).stdout)["id"]
-count = len([c for c in clients if c.get("workspace", {}).get("id") == active_ws])
+count = len([c for c in clients if c.get("workspace", {}).get("id") == active_ws and c.get("class","") not in ("filemanager.py",)])
 
 inputs = subprocess.run(["pactl", "list", "sink-inputs"], capture_output=True, text=True).stdout
 blocks = inputs.split("Sink Input #")

@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100vw; height: 100vh;
+  overflow: hidden;
+  font-family: 'Love Letter Typewriter', 'Courier New', monospace;
+  background: rgba(8, 16, 32, 0.6);
+  user-select: none;
+}
+#tethers { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; pointer-events: none; }
+.tether { stroke: rgba(126,200,212,0.4); stroke-width: 1; fill: none; opacity: 0; }
+@keyframes tetherFade { 0%{opacity:0} 20%{opacity:1} 80%{opacity:1} 100%{opacity:0} }
+.tether.active { animation: tetherFade 1.2s ease-out forwards; }
+.node {
+  position: absolute; z-index: 2;
+  image-rendering: pixelated;
+  border-radius: 50%;
+  animation-name: glow, bob;
+  animation-duration: 2.4s, 4s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  cursor: pointer;
+}
+@keyframes bob { 0%,100%{translate:0 0} 50%{translate:0 -8px} }
+@keyframes glow { 0%,100%{filter:drop-shadow(0 0 8px rgba(90,140,230,0.7))} 50%{filter:drop-shadow(0 0 20px rgba(90,140,230,1))} }
+.node.focused { animation-name: glowFocused, bob; animation-duration: 1.2s, 4s; animation-play-state: running, paused; scale: 1.1; }
+@keyframes glowFocused {
+  0%,100%{filter:drop-shadow(0 0 14px rgba(160,200,255,1)) drop-shadow(0 0 28px rgba(120,170,255,0.9))}
+  50%{filter:drop-shadow(0 0 24px rgba(180,215,255,1)) drop-shadow(0 0 48px rgba(120,170,255,1))}
+}
+.node canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+.node .flash-canvas { opacity: 0; }
+.node.focused .flash-canvas { animation: flashGreen 1.2s ease-in-out infinite; }
+@keyframes flashGreen { 0%,100%{opacity:0} 50%{opacity:0.85} }
+#scroll-container { position: fixed; top: 56px; left: 0; right: 0; bottom: 36px; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
+#scroll-container::-webkit-scrollbar { display: none; }
+#nodes-container { position: relative; width: 100%; }
+#letters { position: fixed; z-index: 4; pointer-events: none; top: 0; left: 0; width: 100vw; height: 100vh; }
+.letter { position: absolute; font-family: 'Love Letter Typewriter', monospace; color: #eaf0ff; font-size: 14px; text-shadow: 1px 1px 0 #1c2454, 2px 2px 0 #141a3a, 3px 3px 0 #0a0d24; transition: left 0.5s ease-in-out, top 0.5s ease-in-out, opacity 0.2s; pointer-events: none; }
+#path { position: fixed; top: 16px; left: 32px; z-index: 5; font-size: 13px; color: rgba(126,200,212,0.55); letter-spacing: 1px; max-width: calc(100vw - 64px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#hint { position: fixed; bottom: 8px; left: 32px; z-index: 5; font-size: 11px; color: rgba(126,200,212,0.35); letter-spacing: 1px; }
+#count { position: fixed; bottom: 8px; right: 32px; z-index: 5; font-size: 11px; color: rgba(126,200,212,0.35); letter-spacing: 1px; }
+#more-indicator { position: fixed; bottom: 8px; left: 50%; transform: translateX(-50%); z-index: 5; font-size: 11px; color: rgba(126,200,212,0.4); letter-spacing: 2px; display: none; animation: pulse 2s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:0.9} }
+.node-label {
+  position: absolute;
+  z-index: 3;
+  font-family: 'Love Letter Typewriter', monospace;
+  color: #eaf0ff;
+  font-size: 11px;
+  text-shadow: 1px 1px 0 #1c2454, 2px 2px 0 #141a3a, 3px 3px 0 #0a0d24;
+  pointer-events: none;
+  white-space: nowrap;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 50%;
+  transform: translateX(-50%) translateY(-50%);
+  text-shadow: none;
+  color: rgba(255,255,255,0.85);
+}
+@keyframes nodeIn {
+  0% { opacity: 0; transform: translateY(30px) scale(0.8); }
+  60% { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes nodeIn {
+  0% { opacity: 0; transform: translateY(30px) scale(0.8); }
+  60% { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.shard { position: fixed; z-index: 6; pointer-events: none; image-rendering: pixelated; overflow: hidden; transition: transform 0.9s cubic-bezier(.3,0,.7,1), opacity 0.3s ease 0.6s; }
+</style>
+</head>
+<body>
+<div id="path"></div>
+<svg id="tethers"></svg>
+<div id="letters"></div>
+<div id="scroll-container"><div id="nodes-container"></div></div>
+<div id="hint">↑↓←→ navigate · enter: open · backspace: up · esc: close</div>
+<div id="count"></div>
+<div id="more-indicator">▾ more</div>
+<script>
+const PAGE_SIZE = 60;
+const NODE_W = 150;
+const NODE_H = 85;
+const GAP_X = 50;
+const GAP_Y = 45;
+const PAD_X = 60;
+const PAD_Y = 30;
+const FOLDER_SCALE = 1.3;
+const SCRAMBLE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#$%&';
+
+let allEntries=[], entries=[], selectedIndex=0;
+let currentPath='', pendingParent=null, currentLetters=[], nodeRects=[];
+
+const pathEl=document.getElementById('path'), countEl=document.getElementById('count');
+const container=document.getElementById('nodes-container');
+const scrollEl=document.getElementById('scroll-container');
+const svg=document.getElementById('tethers'), lettersEl=document.getElementById('letters');
+const moreEl=document.getElementById('more-indicator');
+
+function send(d){window.webkit.messageHandlers.navi.postMessage(JSON.stringify(d));}
+function loadDir(p){send({action:'list_dir',path:p});}
+
+window.onDirResult=function(r){
+  if(!r.ok){pathEl.textContent='error: '+r.error;return;}
+  currentPath=r.path; pendingParent=r.parent;
+  allEntries=r.entries; entries=allEntries.slice(0,PAGE_SIZE);
+  selectedIndex=0; render();
+};
+window.onHome=function(h){loadDir(h);};
+
+function getCols(){
+  const W = window.innerWidth;
+  return Math.max(2, Math.floor((W - PAD_X*2 + GAP_X) / (NODE_W + GAP_X)));
+}
+
+function render(){
+  container.innerHTML=''; lettersEl.innerHTML=''; currentLetters=[]; nodeRects=[];
+  pathEl.textContent=currentPath; countEl.textContent=allEntries.length+' items';
+  moreEl.style.display=allEntries.length>PAGE_SIZE?'block':'none';
+  const cols=getCols();
+  let maxBottom=0;
+  entries.forEach((e,i)=>{
+    const col=i%cols, row=Math.floor(i/cols);
+    const bw=e.is_dir?Math.floor(NODE_W*FOLDER_SCALE):NODE_W;
+    const bh=e.is_dir?Math.floor(NODE_H*FOLDER_SCALE):NODE_H;
+    const cellX=PAD_X+col*(NODE_W+GAP_X);
+    const cellY=PAD_Y+row*(NODE_H+GAP_Y);
+    const rx=cellX-(bw-NODE_W)/2;
+    const ry=cellY-(bh-NODE_H)/2;
+    nodeRects.push({x:rx,y:ry,w:bw,h:bh,cx:rx+bw/2,cy:ry+bh/2});
+    const node=document.createElement('div');
+    node.className='node'+(i===selectedIndex?' focused':'');
+    const rowDelay=(Math.floor(i/cols)*0.12).toFixed(2);
+    node.style.cssText=`left:${rx}px;top:${ry}px;width:${bw}px;height:${bh}px;animation-delay:0s,${(i*0.7)%4}s;opacity:0;animation:nodeIn 0.6s cubic-bezier(0.2,0,0.3,1) ${rowDelay}s forwards, glow 2.4s ease-in-out ${rowDelay}s infinite, bob 4s ease-in-out ${(i*0.7)%4}s infinite;`;
+    const pw=bw,ph=bh;
+    const pill=document.createElement('canvas'); pill.className='pillcanvas'; pill.width=pw; pill.height=ph;
+    const flash=document.createElement('canvas'); flash.className='flash-canvas'; flash.width=pw; flash.height=ph;
+
+    node.appendChild(pill); node.appendChild(flash);
+    const lbl=document.createElement('div'); lbl.className='node-label';
+    let labelText=e.name; if(labelText.length>18) labelText=labelText.slice(0,17)+'…';
+    lbl.textContent=labelText; node.appendChild(lbl);
+    container.appendChild(node);
+    drawPill(pill, pw, ph, e.name);
+    drawFlash(flash, pw, ph);
+    maxBottom=Math.max(maxBottom,ry+bh);
+    node.addEventListener('click',()=>{const p=selectedIndex;selectedIndex=i;updateFocus(p);activate();});
+  });
+  container.style.height=(maxBottom+PAD_Y)+'px';
+  if(entries.length){
+    const r=nodeRects[selectedIndex];
+    spawnLetters(`open ${entries[selectedIndex].name}`,{x:r.cx,y:r.cy},16,r.h);
+  }
+}
+
+function drawPill(c,w,h,name){
+  const ctx=c.getContext('2d'),cx=w/2,cy=h/2,rx=w/2,ry=h/2;
+  ctx.clearRect(0,0,w,h);
+  const g=ctx.createRadialGradient(cx-rx*.3,cy-ry*.35,2,cx,cy,rx*.92);
+  g.addColorStop(0,'#9fb6f2');g.addColorStop(.45,'#6f86d6');g.addColorStop(1,'#3a4ea0');
+  ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(cx,cy,rx*.85,ry*.8,0,0,Math.PI*2);ctx.fill();
+  ctx.globalCompositeOperation='overlay';
+  function sr(s){let x=Math.sin(s+1)*99999;return x-Math.floor(x);}
+  let seed=0;for(let i=0;i<(name||'x').length;i++)seed+=(name||'x').charCodeAt(i)*(i+1);
+  const cnt=2+Math.floor(sr(seed)*2);
+  const basePositions=[
+    [cx-rx*0.4,cy-ry*0.45],[cx+rx*0.5,cy-ry*0.2],[cx-rx*0.1,cy+ry*0.5],[cx+rx*0.2,cy+ry*0.3]
+  ];
+  for(let si=0;si<cnt;si++){
+    const base=basePositions[si%basePositions.length];
+    const sx=base[0]+(sr(seed+si*3)-.5)*rx*0.25;
+    const sy=base[1]+(sr(seed+si*7)-.5)*ry*0.25;
+    const ss=Math.max(3,rx*(0.04+sr(seed+si*11)*0.04));
+    const sa=0.3+sr(seed+si*13)*0.25;
+    const g2=ctx.createRadialGradient(sx,sy,0,sx,sy,ss);
+    g2.addColorStop(0,`rgba(255,255,255,${sa.toFixed(2)})`);
+    g2.addColorStop(1,'rgba(255,255,255,0)');
+    ctx.fillStyle=g2;ctx.beginPath();ctx.arc(sx,sy,ss,0,Math.PI*2);ctx.fill();
+  }
+  ctx.globalCompositeOperation='source-over';
+
+}
+
+function drawText(c,w,h,name){
+  if(!name) return;
+  const ctx=c.getContext('2d'),cx=w/2,cy=h/2;
+  ctx.clearRect(0,0,w,h);
+  const fs=Math.max(7,Math.floor(h*0.13));
+  ctx.font=`${fs}px "Love Letter Typewriter", monospace`;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillStyle='rgba(255,255,255,0.6)';
+  ctx.shadowColor='rgba(0,0,30,0.9)'; ctx.shadowBlur=3;
+  let label=name;
+  const maxW=w*0.78;
+  while(ctx.measureText(label).width>maxW&&label.length>3) label=label.slice(0,-1);
+  if(label.length<name.length) label=label.slice(0,-1)+'…';
+  ctx.fillText(label,cx,cy);
+  ctx.shadowBlur=0;
+}
+function drawFlash(c,w,h){
+  const ctx=c.getContext('2d'),cx=w/2,cy=h/2,rx=w/2,ry=h/2;
+  const g=ctx.createRadialGradient(cx-rx*.3,cy-ry*.35,2,cx,cy,rx*.92);
+  g.addColorStop(0,'#c8ffd9');g.addColorStop(.45,'#6fe0a0');g.addColorStop(1,'#1f8a4f');
+  ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(cx,cy,rx*.85,ry*.8,0,0,Math.PI*2);ctx.fill();
+}
+
+function updateFocus(prev){
+  const nodes=container.querySelectorAll('.node');
+  if(nodes[prev]) nodes[prev].classList.remove('focused');
+  if(nodes[selectedIndex]) nodes[selectedIndex].classList.add('focused');
+  if(prev!==selectedIndex&&nodeRects[prev]&&nodeRects[selectedIndex]){
+    const f={x:nodeRects[prev].cx,y:nodeRects[prev].cy};
+    const t={x:nodeRects[selectedIndex].cx,y:nodeRects[selectedIndex].cy};
+    drawTether(prev,selectedIndex);
+    const r=nodeRects[selectedIndex];
+    travelLetters(`open ${entries[selectedIndex].name}`,f,t,16,r.h);
+  }
+  scrollToSelected();
+}
+
+function scrollToSelected(){
+  if(!nodeRects[selectedIndex]) return;
+  const r=nodeRects[selectedIndex],st=scrollEl.scrollTop,vh=scrollEl.clientHeight;
+  if(r.y<st+20) scrollEl.scrollTo({top:r.y-20,behavior:'smooth'});
+  else if(r.y+r.h>st+vh-20) scrollEl.scrollTo({top:r.y+r.h-vh+20,behavior:'smooth'});
+}
+
+function drawTether(fromIdx,toIdx){
+  const nodes=container.querySelectorAll('.node');
+  const fromEl=nodes[fromIdx], toEl=nodes[toIdx];
+  if(!fromEl||!toEl) return;
+  const fr=fromEl.getBoundingClientRect();
+  const tr=toEl.getBoundingClientRect();
+  const fx=fr.left+fr.width/2, fy=fr.top+fr.height/2;
+  const tx=tr.left+tr.width/2, ty=tr.top+tr.height/2;
+  const dx=tx-fx, dy=ty-fy, dist=Math.sqrt(dx*dx+dy*dy)||1;
+  const nx=dx/dist, ny=dy/dist;
+  const angle=Math.atan2(dy,dx);
+  const r1=((fr.width/2*0.85)*(fr.height/2*0.8))/Math.sqrt(Math.pow((fr.height/2*0.8)*Math.cos(angle),2)+Math.pow((fr.width/2*0.85)*Math.sin(angle),2));
+  const r2=((tr.width/2*0.85)*(tr.height/2*0.8))/Math.sqrt(Math.pow((tr.height/2*0.8)*Math.cos(angle),2)+Math.pow((tr.width/2*0.85)*Math.sin(angle),2));
+  const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+  line.setAttribute('x1',fx+nx*r1); line.setAttribute('y1',fy+ny*r1);
+  line.setAttribute('x2',tx-nx*r2); line.setAttribute('y2',ty-ny*r2);
+  line.setAttribute('class','tether active');
+  svg.appendChild(line);
+  line.addEventListener('animationend',()=>line.remove());
+}
+
+function spawnLetters(text,center,sz,nodeH){
+  lettersEl.innerHTML='';currentLetters=[];
+  const lw=sz*.75,totalW=(text.length-1)*lw,startX=center.x-totalW/2;
+  const s=scrollEl.scrollTop;
+  for(let i=0;i<text.length;i++){
+    const span=document.createElement('div');
+    span.className='letter';span.style.fontSize=sz+'px';
+    span.textContent=text[i]===' '?'\u00A0':text[i];
+    span.style.left=(startX+i*lw)+'px';
+    span.style.top=(center.y-s+56+nodeH/2+10)+'px';
+    lettersEl.appendChild(span);currentLetters.push(span);
+  }
+}
+
+function travelLetters(newText,from,to,sz,nodeH){
+  const old=currentLetters,oldLen=old.length,newLen=newText.length,max=Math.max(oldLen,newLen);
+  const lw=sz*.75,totalW=(newLen-1)*lw,startX=to.x-totalW/2;
+  const dx=to.x-from.x,dy=to.y-from.y,dist=Math.sqrt(dx*dx+dy*dy)||1;
+  const nx=dx/dist,ny=dy/dist,s=scrollEl.scrollTop,newLetters=[];
+  for(let i=0;i<max;i++){
+    let span;
+    if(i<oldLen){span=old[i];}
+    else{
+      span=document.createElement('div');span.className='letter';span.style.fontSize=sz+'px';
+      span.textContent=SCRAMBLE[Math.floor(Math.random()*SCRAMBLE.length)];
+      span.style.left=(from.x-i*nx*lw)+'px';span.style.top=(from.y-s+56)+'px';
+      span.style.opacity='0';lettersEl.appendChild(span);void span.offsetWidth;
+    }
+    const delay=i*50;
+    if(i<newLen){
+      const tx=startX+i*lw,ty=to.y-s+56+nodeH/2+10;
+      newLetters.push(span);
+      setTimeout(()=>{span.style.transitionDelay='0s';span.style.opacity='1';span.style.left=tx+'px';span.style.top=ty+'px';},delay);
+      setTimeout(()=>{
+        let t=0;const iv=setInterval(()=>{t++;span.textContent=SCRAMBLE[Math.floor(Math.random()*SCRAMBLE.length)];
+        if(t>5){clearInterval(iv);span.textContent=newText[i]===' '?'\u00A0':newText[i];}},80);
+      },delay);
+    } else {
+      setTimeout(()=>{span.style.opacity='0';},delay);
+      setTimeout(()=>span.remove(),delay+300);
+    }
+  }
+  currentLetters=newLetters;
+}
+
+function spawnShards(nodeEl,w,h){
+  const rect=nodeEl.getBoundingClientRect(),pill=nodeEl.querySelector('.pillcanvas');
+  if(!pill) return;
+  const cw=pill.width,ch=pill.height;
+  const full=document.createElement('canvas');full.width=cw;full.height=ch;
+  full.getContext('2d').drawImage(pill,0,0);
+  const clips=['polygon(0% 0%, 100% 0%, 50% 50%)','polygon(100% 0%, 100% 100%, 50% 50%)','polygon(100% 100%, 0% 100%, 50% 50%)','polygon(0% 100%, 0% 0%, 50% 50%)'];
+  const sides=['left','right','right','left'];
+  const scx=window.innerWidth/2,scy=window.innerHeight/2;
+  const pcx=rect.left+rect.width/2,pcy=rect.top+rect.height/2;
+  const tcx=scx-pcx,tcy=scy-pcy;
+  clips.forEach((clip,i)=>{
+    setTimeout(()=>{
+      const shard=document.createElement('div');shard.className='shard';
+      const sc=document.createElement('canvas');sc.width=cw;sc.height=ch;
+      sc.getContext('2d').drawImage(full,0,0);
+      shard.appendChild(sc);
+      shard.style.cssText=`width:${rect.width}px;height:${rect.height}px;left:${rect.left}px;top:${rect.top}px;clip-path:${clip};-webkit-clip-path:${clip};filter:contrast(1.15) brightness(1.05) drop-shadow(0 0 1px rgba(0,0,0,0.7));`;
+      sc.style.cssText='width:100%;height:100%;';
+      document.body.appendChild(shard);
+      void shard.offsetWidth;
+      const dir=sides[i]==='left'?-1:1;
+      const vs=(i===0||i===2)?-180:180;
+      const fx=tcx+dir*(window.innerWidth*2.5);
+      const fy=tcy+vs*3+(Math.random()-.5)*200;
+      const rot=dir*(60+Math.random()*120)+vs*0.3;
+      requestAnimationFrame(()=>{
+        shard.style.transition='transform 0.25s ease-in';
+        shard.style.transform=`translate(${tcx}px,${tcy}px) scale(2.2) rotate(${rot*0.1}deg)`;
+      });
+      setTimeout(()=>{
+        shard.style.transition='transform 2.2s cubic-bezier(.2,0,.6,1), opacity 0.6s ease 1.8s';
+        shard.style.transform=`translate(${fx}px,${fy}px) scale(1.5) rotate(${rot}deg)`;
+        shard.style.opacity='0';
+      },250);
+      setTimeout(()=>shard.remove(),2700);
+    },i*100);
+  });
+}
+
+function activate(){
+  const e=entries[selectedIndex];if(!e) return;
+  const nodes=container.querySelectorAll('.node'),r=nodeRects[selectedIndex];
+  if(nodes[selectedIndex]) spawnShards(nodes[selectedIndex],r.w,r.h);
+  send({action:'sound',name:'open'});
+  if(e.is_dir) setTimeout(()=>loadDir(e.path),260);
+  else{send({action:'open_file',path:e.path});setTimeout(()=>send({action:'quit'}),200);}
+}
+
+function goUp(){
+  if(!pendingParent) return;
+  const nodes=container.querySelectorAll('.node'),r=nodeRects[selectedIndex];
+  if(nodes[selectedIndex]) spawnShards(nodes[selectedIndex],r.w,r.h);
+  setTimeout(()=>loadDir(pendingParent),260);
+}
+
+function findNearest(dir){
+  const c=nodeRects[selectedIndex];let best=selectedIndex,bestD=Infinity;
+  nodeRects.forEach((r,i)=>{
+    if(i===selectedIndex) return;
+    const dx=r.cx-c.cx,dy=r.cy-c.cy;
+    const ok=(dir==='right'&&dx>10)||(dir==='left'&&dx<-10)||(dir==='down'&&dy>10)||(dir==='up'&&dy<-10);
+    if(!ok) return;
+    const d=Math.hypot(dx,dy);if(d<bestD){bestD=d;best=i;}
+  });
+  return best;
+}
+
+let lastNav=0;
+window.addEventListener('keydown',e=>{
+  const now=Date.now();
+  if(['ArrowRight','ArrowLeft','ArrowDown','ArrowUp'].includes(e.key)){
+    if(now-lastNav<180) return;
+    lastNav=now;
+    send({action:'sound',name:'switch'});
+  }
+  const prev=selectedIndex;
+  if(e.key==='ArrowRight') selectedIndex=findNearest('right');
+  else if(e.key==='ArrowLeft') selectedIndex=findNearest('left');
+  else if(e.key==='ArrowDown') selectedIndex=findNearest('down');
+  else if(e.key==='ArrowUp') selectedIndex=findNearest('up');
+  else if(e.key==='Enter'){activate();return;}
+  else if(e.key==='Backspace'){goUp();return;}
+  else if(e.key==='Escape'){
+    const nodes=container.querySelectorAll('.node');
+    const rows=Math.ceil(entries.length/getCols());
+    nodes.forEach((n,i)=>{
+      const row=Math.floor(i/getCols());
+      const delay=((rows-1-row)*0.1).toFixed(2);
+      n.style.animation='none';
+      n.style.opacity='1';
+      void n.offsetWidth;
+      setTimeout(()=>{
+        n.style.transition=`opacity 0.35s ease-in, transform 0.35s ease-in`;
+        n.style.opacity='0';
+        n.style.transform='translateY(24px) scale(0.82)';
+      }, (rows-1-row)*100);
+    });
+    setTimeout(()=>send({action:'quit'}),rows*80+400);
+    return;
+  }
+  if(selectedIndex!==prev) updateFocus(prev);
+});
+
+window.addEventListener('resize',render);
+send({action:'get_home'});
+</script>
+</body>
+</html>

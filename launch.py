@@ -31,7 +31,7 @@ class Api:
         elif label == "browser":
             cmd, target = "firefox", "firefox"
         elif label == "files":
-            cmd, target = "thunar", "thunar"
+            cmd, target = "python3 /home/drennant/navi-ui/filemanager.py", "filemanager"
         elif label == "spotify":
             cmd, target = "spotify", "spotify"
         elif label == "ryujinx":

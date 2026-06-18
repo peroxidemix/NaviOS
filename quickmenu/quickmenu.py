@@ -14,7 +14,7 @@ class Api:
             Gtk.main_quit()
             return
         subprocess.Popen(["paplay", "--volume=65536", "/home/drennant/navi-ui/open.wav"])
-        cmd = {"terminal": "kitty", "browser": "firefox", "files": "thunar", "spotify": "spotify", "ryujinx": "flatpak run io.github.ryubing.Ryujinx", "bluetooth": "blueman-manager"}.get(label)
+        cmd = {"terminal": "kitty", "browser": "firefox", "files": "python3 /home/drennant/navi-ui/filemanager.py", "spotify": "spotify", "ryujinx": "flatpak run io.github.ryubing.Ryujinx", "bluetooth": "blueman-manager"}.get(label)
         if cmd:
             ws = subprocess.run(["hyprctl", "activeworkspace", "-j"], capture_output=True, text=True)
             wsid = json.loads(ws.stdout)["id"]
